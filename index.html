@@ -215,19 +215,39 @@ html.mob .sklog .lcard:hover{transform:none}
 <script id="sky-backend">
 /* ===== SKY-HR backend connection (Google Apps Script web app) =====
    Named SKY_BACKEND because the page already has a simulated SKY_API (employee lookup / save) further down.
-   URL and Client ID are not secrets. Never put API keys here. */
-window.SKY_BACKEND={
- url:'https://script.google.com/macros/s/AKfycbzrgbFruT_bUZN773g8rKcsqXuDFYxGiO--VFxMDXstpdLBuhZ34yzMwuiMlhjV4HG6/exec',
- clientId:'',      /* fill with the Google OAuth Web client id when sign-in is added */
- idToken:null,     /* set after Google sign-in */
- call:async function(action,data){
-  var r=await fetch(this.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,idToken:this.idToken,data:data||{}})});
+   URL and Client ID are NOT secrets. Never put API keys here (the Gemini key lives in Script properties). */
+window.SKY_BACKEND=(function(){
+ var B={
+  url:'https://script.google.com/macros/s/AKfycbzrgbFruT_bUZN773g8rKcsqXuDFYxGiO--VFxMDXstpdLBuhZ34yzMwuiMlhjV4HG6/exec',
+  clientId:'',   /* paste the Google OAuth Web client id here to enable sign-in */
+  idToken:null, user:null
+ };
+ function exp(t){try{return JSON.parse(atob(t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/'))).exp*1000}catch(e){return 0}}
+ B.signedIn=function(){return !!B.idToken&&exp(B.idToken)>Date.now()+30000};
+ /* Google sign-in (Google Identity Services). Resolves when an ID token is received. */
+ B.signIn=function(){
+  return new Promise(function(ok,no){
+   if(!B.clientId)return no(new Error('clientId is empty'));
+   function go(){
+    google.accounts.id.initialize({client_id:B.clientId,auto_select:true,callback:function(r){B.idToken=r.credential;ok(B.idToken)}});
+    google.accounts.id.prompt(function(n){if(n.isNotDisplayed&&n.isNotDisplayed()||n.isSkippedMoment&&n.isSkippedMoment())no(new Error('sign-in not shown'))})
+   }
+   if(window.google&&google.accounts)return go();
+   var sc=document.createElement('script');sc.src='https://accounts.google.com/gsi/client';sc.async=true;sc.onload=go;sc.onerror=function(){no(new Error('Google sign-in failed to load'))};document.head.appendChild(sc)
+  })
+ };
+ /* POST as text/plain so the browser sends no CORS preflight (Apps Script cannot answer one). */
+ B.call=async function(action,data){
+  if(action!=='ping'&&!B.signedIn())await B.signIn();
+  var r=await fetch(B.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,idToken:B.idToken,data:data||{}})});
   var j=await r.json();
   if(!j.ok){var e=new Error(j.message||'Error');e.code=j.code;throw e}
   return j.data
- },
- ping:function(){return this.call('ping')}
-};
+ };
+ B.ping=function(){return B.call('ping')};
+ B.me=function(){return B.call('me').then(function(u){B.user=u;return u})};
+ return B
+})();
 </script>
 </head>
 <body>
