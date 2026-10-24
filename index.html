@@ -212,6 +212,23 @@ html.mob.sk-framed #bnav button{padding-inline:0}
 html.mob .skhero2{grid-template-columns:1fr;padding:18px;border-radius:22px}html.mob .skseal{width:68px;height:68px}html.mob .skhero2 h3{font-size:18px}
 html.mob .sklog .lcard:hover{transform:none}
 </style>
+<script id="sky-backend">
+/* ===== SKY-HR backend connection (Google Apps Script web app) =====
+   Named SKY_BACKEND because the page already has a simulated SKY_API (employee lookup / save) further down.
+   URL and Client ID are not secrets. Never put API keys here. */
+window.SKY_BACKEND={
+ url:'https://script.google.com/macros/s/AKfycbzrgbFruT_bUZN773g8rKcsqXuDFYxGiO--VFxMDXstpdLBuhZ34yzMwuiMlhjV4HG6/exec',
+ clientId:'',      /* fill with the Google OAuth Web client id when sign-in is added */
+ idToken:null,     /* set after Google sign-in */
+ call:async function(action,data){
+  var r=await fetch(this.url,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:action,idToken:this.idToken,data:data||{}})});
+  var j=await r.json();
+  if(!j.ok){var e=new Error(j.message||'Error');e.code=j.code;throw e}
+  return j.data
+ },
+ ping:function(){return this.call('ping')}
+};
+</script>
 </head>
 <body>
 <input type="file" id="fi" hidden accept=".pdf,.jpg,.jpeg,.png,image/*" onchange="picked(this)"><input type="file" id="fic" hidden accept="image/*" capture="environment" onchange="picked(this)">
